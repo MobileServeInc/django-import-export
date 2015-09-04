@@ -89,6 +89,7 @@
     <thead>
       <tr>
         <th></th>
+        <th>skip_reason</th>
         {% for field in result.diff_headers %}
           <th>{{ field }}</th>
         {% endfor %}
@@ -107,10 +108,12 @@
           {% trans "Update" %}
         {% endif %}
       </td>
+      <td>{{ row.skip_reason }}</td>
       {% for field in row.diff %}
       <td>
         {{ field }}
       </td>
+      <td
       {% endfor %}
     </tr>
     {% endfor %}

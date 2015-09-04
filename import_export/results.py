@@ -19,6 +19,7 @@ class RowResult(object):
         self.errors = []
         self.diff = None
         self.import_type = None
+        self.skip_reason = None
 
 
 class Result(object):

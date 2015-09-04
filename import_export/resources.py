@@ -189,19 +189,19 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
         else:
             return (self.init_instance(row), True)
 
-    def save_instance(self, instance, dry_run=False):
-        self.before_save_instance(instance, dry_run)
+    def save_instance(self, instance, data, dry_run=False):
+        self.before_save_instance(instance, data, dry_run)
         if not dry_run:
             instance.save()
-        self.after_save_instance(instance, dry_run)
+        self.after_save_instance(instance, data, dry_run)
 
-    def before_save_instance(self, instance, dry_run):
+    def before_save_instance(self, instance, data, dry_run):
         """
         Override to add additional logic.
         """
         pass
 
-    def after_save_instance(self, instance, dry_run):
+    def after_save_instance(self, instance, data, dry_run):
         """
         Override to add additional logic.
         """
@@ -226,7 +226,7 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
         pass
 
     def import_field(self, field, obj, data):
-        if field.attribute and field.column_name in data:
+        if field.column_name in data:
             field.save(obj, data)
 
     def import_obj(self, obj, data, dry_run):
@@ -259,7 +259,7 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
         """
         return False
 
-    def skip_row(self, instance, original):
+    def skip_row(self, instance, original, data):
         """
         Returns ``True`` if ``row`` importing should be skipped.
 
@@ -267,17 +267,17 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
         Override this method to handle skipping rows meeting certain conditions.
         """
         if not self._meta.skip_unchanged:
-            return False
+            return False, ""
         for field in self.get_fields():
             try:
                 # For fields that are models.fields.related.ManyRelatedManager
                 # we need to compare the results
                 if list(field.get_value(instance).all()) != list(field.get_value(original).all()):
-                    return False
+                    return False, ""
             except AttributeError:
                 if field.get_value(instance) != field.get_value(original):
-                    return False
-        return True
+                    return False, ""
+        return True, "Skipping unchanged existing record"
 
     def get_diff(self, original, current, dry_run=False):
         """
@@ -371,10 +371,12 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
                                 real_dry_run)
                 else:
                     self.import_obj(instance, row, real_dry_run)
-                    if self.skip_row(instance, original):
+                    should_skip, reason = self.skip_row(instance, original, row)
+                    if should_skip:
                         row_result.import_type = RowResult.IMPORT_TYPE_SKIP
+                        row_result.skip_reason = reason
                     else:
-                        self.save_instance(instance, real_dry_run)
+                        self.save_instance(instance, row, real_dry_run)
                         self.save_m2m(instance, row, real_dry_run)
                         # Add object info to RowResult for LogEntry
                         row_result.object_repr = force_text(instance)

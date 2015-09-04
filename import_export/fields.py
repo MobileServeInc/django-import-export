@@ -32,6 +32,7 @@ class Field(object):
             widget = widgets.Widget()
         self.widget = widget
         self.readonly = readonly
+        self.non_attribute_value = None
 
     def __repr__(self):
         """
@@ -66,7 +67,7 @@ class Field(object):
         Returns value for this field from object attribute.
         """
         if self.attribute is None:
-            return None
+            return self.non_attribute_value
 
         attrs = self.attribute.split('__')
         value = obj
@@ -88,11 +89,16 @@ class Field(object):
         return value
 
     def save(self, obj, data):
+        if self.attribute is None:
+            self.non_attribute_value = data.get(self.column_name)
+            return
+
         """
         Cleans this field value and assign it to provided object.
         """
         if not self.readonly:
             setattr(obj, self.attribute, self.clean(data))
+
 
     def export(self, obj):
         """

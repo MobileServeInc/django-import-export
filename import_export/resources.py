@@ -311,6 +311,13 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
         """
         pass
 
+    def after_import_data(self, saved_instance_ids, dry_run):
+        """
+        Override to add additional logic.
+        """
+        pass
+
+
     @atomic()
     def import_data(self, dataset, dry_run=False, raise_errors=False,
             use_transactions=None, **kwargs):
@@ -348,6 +355,7 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
                 raise
 
         instance_loader = self._meta.instance_loader_class(self, dataset)
+        saved_instance_ids = []
 
         for row in dataset.dict:
             try:
@@ -378,6 +386,7 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
                     else:
                         self.save_instance(instance, row, real_dry_run)
                         self.save_m2m(instance, row, real_dry_run)
+                        saved_instance_ids.append(instance.pk)
                         # Add object info to RowResult for LogEntry
                         row_result.object_repr = force_text(instance)
                         row_result.object_id = instance.pk
@@ -403,6 +412,8 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
                 savepoint_rollback(sp1)
             else:
                 savepoint_commit(sp1)
+
+        self.after_import_data(saved_instance_ids, dry_run)
 
         return result
 

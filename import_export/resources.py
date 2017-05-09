@@ -453,8 +453,10 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
                     diff.compare_with(self, None, dry_run)
             else:
                 self.import_obj(instance, row, dry_run)
-                if self.skip_row(instance, original, row):
+                should_skip, reason = self.skip_row(instance, original, row)
+                if should_skip
                     row_result.import_type = RowResult.IMPORT_TYPE_SKIP
+                    row_result.skip_reason = reason
                 else:
                     with transaction.atomic():
                         self.save_instance(instance, row, using_transactions, dry_run)

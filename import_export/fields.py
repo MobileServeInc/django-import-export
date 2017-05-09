@@ -4,6 +4,7 @@ from . import widgets
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models.manager import Manager
+from django.db.models.fields import NOT_PROVIDED
 
 
 class Field(object):
@@ -11,22 +12,28 @@ class Field(object):
     Field represent mapping between `object` field and representation of
     this field.
 
-    ``attribute`` string of either an instance attribute or callable
-    off the object.
+    :param attribute: A string of either an instance attribute or callable off
+        the object.
 
-    ``column_name`` let you provide how this field is named
-    in datasource.
+    :param column_name: Lets you provide a name for the column that represents
+        this field in the export.
 
-    ``widget`` defines widget that will be used to represent field data
-    in export.
+    :param widget: Defines a widget that will be used to represent this
+        field's data in the export.
 
-    ``readonly`` boolean value defines that if this field will be assigned
-    to object during import.
+    :param readonly: A Boolean which defines if this field will be ignored
+        during import.
+
+    :param default: This value will be returned by
+        :meth:`~import_export.fields.Field.clean` if this field's widget did
+        not return an adequate value.
     """
+    empty_values = [None, '']
 
     def __init__(self, attribute=None, column_name=None, widget=None,
-            readonly=False):
+                 default=NOT_PROVIDED, readonly=False):
         self.attribute = attribute
+        self.default = default
         self.column_name = column_name
         if not widget:
             widget = widgets.Widget()
@@ -46,25 +53,31 @@ class Field(object):
 
     def clean(self, data):
         """
-        Takes value stored in the data for the field and returns it as
-        appropriate python object.
+        Translates the value stored in the imported datasource to an
+        appropriate Python object and returns it.
         """
         try:
             value = data[self.column_name]
         except KeyError:
             raise KeyError("Column '%s' not found in dataset. Available "
-                "columns are: %s" % (self.column_name, list(data.keys())))
+                           "columns are: %s" % (self.column_name,
+                                                list(data.keys())))
 
         try:
-            value = self.widget.clean(value)
+            value = self.widget.clean(value, row=data)
         except ValueError as e:
             raise ValueError("Column '%s': %s" % (self.column_name, e))
+
+        if value in self.empty_values and self.default != NOT_PROVIDED:
+            if callable(self.default):
+                return self.default()
+            return self.default
 
         return value
 
     def get_value(self, obj):
         """
-        Returns value for this field from object attribute.
+        Returns the value of the object's attribute.
         """
         if self.attribute is None:
             return self.non_attribute_value
@@ -74,7 +87,7 @@ class Field(object):
 
         for attr in attrs:
             try:
-                value = getattr(value, attr)
+                value = getattr(value, attr, None)
             except (ValueError, ObjectDoesNotExist):
                 # needs to have a primary key value before a many-to-many
                 # relationship can be used.
@@ -94,10 +107,14 @@ class Field(object):
             return
 
         """
-        Cleans this field value and assign it to provided object.
+        If this field is not declared readonly, the object's attribute will
+        be set to the value returned by :meth:`~import_export.fields.Field.clean`.
         """
         if not self.readonly:
-            setattr(obj, self.attribute, self.clean(data))
+            attrs = self.attribute.split('__')
+            for attr in attrs[:-1]:
+                obj = getattr(obj, attr, None)
+            setattr(obj, attrs[-1], self.clean(data))
 
 
     def export(self, obj):
@@ -108,4 +125,4 @@ class Field(object):
         value = self.get_value(obj)
         if value is None:
             return ""
-        return self.widget.render(value)
+        return self.widget.render(value, obj)

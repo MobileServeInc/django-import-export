@@ -454,7 +454,7 @@ class Resource(six.with_metaclass(DeclarativeMetaclass)):
             else:
                 self.import_obj(instance, row, dry_run)
                 should_skip, reason = self.skip_row(instance, original, row)
-                if should_skip
+                if should_skip:
                     row_result.import_type = RowResult.IMPORT_TYPE_SKIP
                     row_result.skip_reason = reason
                 else:
